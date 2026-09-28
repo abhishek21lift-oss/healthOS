@@ -65,7 +65,7 @@ jobs:
             echo "Tracked .env file found — Phase 0 forbids committing env files." >&2
             exit 1
           fi
-          if git grep -nEI '(aws_secret_access_key|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})' -- ':!.env.example' ':!pnpm-lock.yaml' ; then
+          if git grep -nEI '(aws_secret_access_key|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})' -- ':!.env.example' ':!pnpm-lock.yaml' ':!.github/workflows/ci.yml' ; then
             echo "Possible secret material found in source." >&2
             exit 1
           fi
