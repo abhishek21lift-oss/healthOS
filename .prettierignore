@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.turbo
+pnpm-lock.yaml
+.env
+.env.*
+!.env.example
+packages/*/src/**/*.js
+packages/*/src/**/*.d.ts
+apps/*/src/**/*.js
+apps/*/src/**/*.d.ts

@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: install → lint → typecheck → test → boundaries → build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: 'true'
+      HEALTH_OS_PG_HOST: 127.0.0.1
+      HEALTH_OS_PG_PORT: '5433'
+      HEALTH_OS_PG_DB: health_os_test
+      HEALTH_OS_PG_SUPERUSER: postgres
+      HEALTH_OS_PG_SUPERUSER_PASSWORD: postgres_test_pw
+      HEALTH_OS_PG_OWNER: health_owner
+      HEALTH_OS_PG_OWNER_PASSWORD: health_owner_dev_pw
+      HEALTH_OS_PG_APP: health_app
+      HEALTH_OS_PG_APP_PASSWORD: health_app_dev_pw
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_test_pw
+          POSTGRES_DB: health_os_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Secret scan (basic patterns)
+        run: |
+          set -euo pipefail
+          # Fail on obvious secrets or real .env files tracked in the tree
+          if git ls-files | grep -E '(^|/)\.env$' ; then
+            echo "Tracked .env file found — Phase 0 forbids committing env files." >&2
+            exit 1
+          fi
+          if git grep -nEI '(aws_secret_access_key|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})' -- ':!.env.example' ':!pnpm-lock.yaml' ; then
+            echo "Possible secret material found in source." >&2
+            exit 1
+          fi
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck && pnpm typecheck:root
+
+      - name: Unit + database RLS + architecture tests
+        run: pnpm test
+
+      - name: Dependency boundaries
+        run: pnpm boundaries
+
+      - name: Build
+        run: pnpm build
+
+      - name: Dependency audit
+        run: pnpm deps:audit

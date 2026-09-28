@@ -1,0 +1,43 @@
+{
+  "name": "health-collaboration-os",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI-native, person-centric health collaboration infrastructure (monorepo). Phase 0 foundation only.",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=22.18.0 <27",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "typecheck:root": "tsc -p tsconfig.eslint.json --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:architecture": "vitest run --project architecture",
+    "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages tests",
+    "deps:audit": "pnpm audit --audit-level moderate",
+    "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run typecheck:root && pnpm run test && pnpm run boundaries && pnpm run build",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "dependency-cruiser": "^16.10.2",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.1.4",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,14 @@
+module.exports = {
+  printWidth: 100,
+  singleQuote: true,
+  trailingComma: 'all',
+  endOfLine: 'lf',
+  overrides: [
+    {
+      files: ['*.md'],
+      options: {
+        proseWrap: 'preserve',
+      },
+    },
+  ],
+};

@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "allowJs": true,
+    "checkJs": false,
+    "types": ["node"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "verbatimModuleSyntax": false,
+    "baseUrl": ".",
+    "paths": {
+      "@health-os/domain": ["packages/domain/src/index.ts"],
+      "@health-os/validation": ["packages/validation/src/index.ts"],
+      "@health-os/permissions": ["packages/permissions/src/index.ts"],
+      "@health-os/database": ["packages/database/src/index.ts"],
+      "@health-os/auth": ["packages/auth/src/index.ts"],
+      "@health-os/ui": ["packages/ui/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/src/**/*.tsx",
+    "apps/*/src/**/*.ts",
+    "apps/*/src/**/*.tsx",
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "*.mts"
+  ],
+  "exclude": ["**/dist/**", "**/node_modules/**", "**/.turbo/**", "eslint.config.mjs"]
+}

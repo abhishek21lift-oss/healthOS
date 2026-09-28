@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+  - tooling/*
+
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  sharp: false
+  workerd: false
+  '@tailwindcss/oxide': false
