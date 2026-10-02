@@ -1,11 +1,11 @@
 import { invalidValue } from './errors.js';
 
-function requireId<T extends string>(entity: string, value: string): T {
+function requireId(entity: string, value: string): string {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
     throw invalidValue(entity, 'identifier must be a non-empty string');
   }
-  return trimmed as T;
+  return trimmed;
 }
 
 export type PersonId = string & {
@@ -97,89 +97,89 @@ export type RelationshipId = string & {
 };
 
 export function personId(value: string): PersonId {
-  return requireId('PersonId', value);
+  return requireId('PersonId', value) as PersonId;
 }
 
 export function professionalId(value: string): ProfessionalId {
-  return requireId('ProfessionalId', value);
+  return requireId('ProfessionalId', value) as ProfessionalId;
 }
 
 export function organizationId(value: string): OrganizationId {
-  return requireId('OrganizationId', value);
+  return requireId('OrganizationId', value) as OrganizationId;
 }
 
 export function careTeamId(value: string): CareTeamId {
-  return requireId('CareTeamId', value);
+  return requireId('CareTeamId', value) as CareTeamId;
 }
 
 export function careTeamMembershipId(value: string): CareTeamMembershipId {
-  return requireId('CareTeamMembershipId', value);
+  return requireId('CareTeamMembershipId', value) as CareTeamMembershipId;
 }
 
 export function organizationMembershipId(value: string): OrganizationMembershipId {
-  return requireId('OrganizationMembershipId', value);
+  return requireId('OrganizationMembershipId', value) as OrganizationMembershipId;
 }
 
 export function consentId(value: string): ConsentId {
-  return requireId('ConsentId', value);
+  return requireId('ConsentId', value) as ConsentId;
 }
 
 export function consentRevisionId(value: string): ConsentRevisionId {
-  return requireId('ConsentRevisionId', value);
+  return requireId('ConsentRevisionId', value) as ConsentRevisionId;
 }
 
 export function accessGrantId(value: string): AccessGrantId {
-  return requireId('AccessGrantId', value);
+  return requireId('AccessGrantId', value) as AccessGrantId;
 }
 
 export function accessRequestId(value: string): AccessRequestId {
-  return requireId('AccessRequestId', value);
+  return requireId('AccessRequestId', value) as AccessRequestId;
 }
 
 export function assessmentId(value: string): AssessmentId {
-  return requireId('AssessmentId', value);
+  return requireId('AssessmentId', value) as AssessmentId;
 }
 
 export function goalId(value: string): GoalId {
-  return requireId('GoalId', value);
+  return requireId('GoalId', value) as GoalId;
 }
 
 export function carePlanId(value: string): CarePlanId {
-  return requireId('CarePlanId', value);
+  return requireId('CarePlanId', value) as CarePlanId;
 }
 
 export function interventionId(value: string): InterventionId {
-  return requireId('InterventionId', value);
+  return requireId('InterventionId', value) as InterventionId;
 }
 
 export function outcomeId(value: string): OutcomeId {
-  return requireId('OutcomeId', value);
+  return requireId('OutcomeId', value) as OutcomeId;
 }
 
 export function observationId(value: string): ObservationId {
-  return requireId('ObservationId', value);
+  return requireId('ObservationId', value) as ObservationId;
 }
 
 export function documentId(value: string): DocumentId {
-  return requireId('DocumentId', value);
+  return requireId('DocumentId', value) as DocumentId;
 }
 
 export function handoffId(value: string): HandoffId {
-  return requireId('HandoffId', value);
+  return requireId('HandoffId', value) as HandoffId;
 }
 
 export function invitationId(value: string): InvitationId {
-  return requireId('InvitationId', value);
+  return requireId('InvitationId', value) as InvitationId;
 }
 
 export function privateProfessionalNoteId(value: string): PrivateProfessionalNoteId {
-  return requireId('PrivateProfessionalNoteId', value);
+  return requireId('PrivateProfessionalNoteId', value) as PrivateProfessionalNoteId;
 }
 
 export function professionalRoleId(value: string): ProfessionalRoleId {
-  return requireId('ProfessionalRoleId', value);
+  return requireId('ProfessionalRoleId', value) as ProfessionalRoleId;
 }
 
 export function relationshipId(value: string): RelationshipId {
-  return requireId('RelationshipId', value);
+  return requireId('RelationshipId', value) as RelationshipId;
 }
