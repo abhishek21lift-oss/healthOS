@@ -71,7 +71,7 @@ function limitOrFail(
   }
 }
 async function loadAccountByEmail(client: PoolClient, email: string) {
-  const res = await client.query(
+  const res = await client.query<{ account_id: string; password_hash: string; status: string; email_verified_at: Date | string | null; failed_login_count: number; locked_until: Date | string | null; person_id: string | null; professional_id: string | null }>(
     `SELECT account_id, password_hash, status, email_verified_at,
             failed_login_count, locked_until, person_id, professional_id
      FROM accounts WHERE email_normalized = $1`,
@@ -186,12 +186,12 @@ export async function registerAccount(
       if ((existing.rowCount ?? 0) > 0) {
         throw new AuthError('duplicate_identity', 'Unable to register');
       }
-      const person = await client.query(
-        `INSERT INTO persons (display_name, is_adult) VALUES ($1, true) RETURNING person_id`,
+      const person = await client.query<{ person_id: string }>(
+        `INSERT INTO persons (display_name, is_adult) VALUES ($1, true) RETURNING person_id`, 
         [email.split('@')[0] ?? 'person'],
       );
       const newPersonId = person.rows[0]?.person_id ?? '';
-      const acc = await client.query(
+      const acc = await client.query<{ account_id: string }>(
         `INSERT INTO accounts (
            email_normalized, email_display, password_hash, status,
            birth_date, person_id
@@ -267,7 +267,7 @@ export async function verifyEmail(
   const tokenHash = hashToken(input.token);
   const now = nowDate(deps);
   const result = await runInSystemContext(deps.pool, 'auth:verify_email', async (client) => {
-    const found = await client.query(
+    const found = await client.query<{ verification_id: string; account_id: string; expires_at: Date | string; consumed_at: Date | string | null }>(
       `SELECT verification_id, account_id, expires_at, consumed_at
        FROM email_verification_tokens
        WHERE token_hash = $1`,
@@ -398,7 +398,7 @@ export async function login(
     const sessionToken = generateToken();
     const csrfToken = generateCsrfToken();
     const tokenHash = hashToken(sessionToken);
-    const sess = await client.query(
+    const sess = await client.query<{ session_id: string }>(
       `INSERT INTO sessions (
          account_id, token_hash, csrf_token, created_at, last_seen_at,
          authenticated_at, expires_at, absolute_expires_at
@@ -454,7 +454,7 @@ export async function logout(
 ): Promise<void> {
   const tokenHash = hashToken(input.sessionToken);
   await runInSystemContext(deps.pool, 'auth:logout', async (client) => {
-    const res = await client.query(
+    const res = await client.query<{ session_id: string; account_id: string }>(
       `UPDATE sessions
        SET revoked_at = $1
        WHERE token_hash = $2 AND revoked_at IS NULL
@@ -495,7 +495,7 @@ export async function resolveSession(
     | { kind: 'idle_expired'; sessionId: string }
     | { kind: 'touch'; principal: AuthenticatedPrincipal }
   >(deps.pool, 'auth:resolve_session', async (client) => {
-    const res = await client.query(
+    const res = await client.query<{ session_id: string; account_id: string; expires_at: Date | string; absolute_expires_at: Date | string; revoked_at: Date | string | null; last_seen_at: Date | string; email_normalized: string; status: string; person_id: string | null; professional_id: string | null }>(
       `SELECT s.session_id, s.account_id, s.expires_at, s.absolute_expires_at,
                 s.revoked_at, s.last_seen_at,
                 a.email_normalized, a.status, a.person_id, a.professional_id
@@ -565,13 +565,13 @@ export async function rotateSession(
   const tokenHash = hashToken(sessionToken);
   const previousHash = hashToken(input.sessionToken);
   const sessionId = await runInSystemContext(deps.pool, 'auth:rotate_session', async (client) => {
-    const old = await client.query(
+    const old = await client.query<{ session_id: string }>(
       `UPDATE sessions SET revoked_at = $1 WHERE token_hash = $2 AND revoked_at IS NULL
          RETURNING session_id`,
       [now, previousHash],
     );
     const previousId = old.rows[0]?.session_id ?? null;
-    const sess = await client.query(
+    const sess = await client.query<{ session_id: string }>(
       `INSERT INTO sessions (
            account_id, token_hash, csrf_token, created_at, last_seen_at,
            authenticated_at, expires_at, absolute_expires_at, rotated_from_session_id
@@ -613,7 +613,7 @@ export async function revokeSessionById(
   meta: RequestMeta = {},
 ): Promise<void> {
   await runInSystemContext(deps.pool, 'auth:revoke_session', async (client) => {
-    const res = await client.query(
+    const res = await client.query<{ account_id: string }>(
       `UPDATE sessions SET revoked_at = $1 WHERE session_id = $2 AND revoked_at IS NULL
        RETURNING account_id`,
       [nowDate(deps), sessionId],
@@ -657,7 +657,7 @@ export async function claimInvitation(
   const now = nowDate(deps);
   try {
     const result = await runInSystemContext(deps.pool, 'auth:claim_invitation', async (client) => {
-      const found = await client.query(
+      const found = await client.query<{ invitation_id: string; status: string; expires_at: Date | string; contact_point: string; recipient_normalized: string | null; consumed_at: Date | string | null }>(
         `SELECT invitation_id, status, expires_at, contact_point,
                   recipient_normalized, consumed_at
            FROM invitations
@@ -689,7 +689,7 @@ export async function claimInvitation(
         });
         throw new AuthError('wrong_recipient', 'Invitation is invalid or expired');
       }
-      const existingContact = await client.query(
+      const existingContact = await client.query<{ person_id: string; verified_at: Date | string | null }>(
         `SELECT person_id, verified_at FROM contact_points
            WHERE kind = 'email' AND normalized_value = $1 AND person_id IS NOT NULL`,
         [claimant],
@@ -701,7 +701,7 @@ export async function claimInvitation(
         // I-17: never fork an existing person on contact match.
         personId = prior.person_id;
       } else {
-        const acc = await client.query(
+        const acc = await client.query<{ person_id: string | null }>(
           `SELECT person_id FROM accounts WHERE email_normalized = $1`,
           [claimant],
         );
@@ -715,7 +715,7 @@ export async function claimInvitation(
             [claimant, personId, now],
           );
         } else {
-          const person = await client.query(
+          const person = await client.query<{ person_id: string }>(
             `INSERT INTO persons (display_name, is_adult) VALUES ($1, true) RETURNING person_id`,
             [claimant.split('@')[0] ?? 'person'],
           );
@@ -729,7 +729,7 @@ export async function claimInvitation(
           );
         }
       }
-      const accepted = await client.query(
+      const accepted = await client.query<{ invitation_id: string }>(
         `UPDATE invitations
            SET status = 'accepted', consumed_at = $1, claimed_person_id = $2
            WHERE invitation_id = $3 AND status = 'pending' AND consumed_at IS NULL
@@ -799,7 +799,7 @@ export async function createInvitation(
     deps.pool,
     'auth:create_invitation',
     async (client) => {
-      const res = await client.query(
+      const res = await client.query<{ invitation_id: string }>(
         `INSERT INTO invitations (
            flow, status, contact_point, invited_by_professional_id, organization_id,
            requested_categories, issued_at, expires_at, token_hash, recipient_normalized
