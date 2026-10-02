@@ -57,25 +57,25 @@ export async function seedFixture(client: pg.PoolClient): Promise<FixtureIds> {
   await client.query('DELETE FROM organizations');
   await client.query('DELETE FROM professionals');
   await client.query('DELETE FROM persons');
-  const alice = await client.query(
+  const alice = await client.query<{ person_id: string }>(
     `INSERT INTO persons (display_name, is_adult) VALUES ('Alice Synthetic', true) RETURNING person_id`,
   );
-  const bob = await client.query(
+  const bob = await client.query<{ person_id: string }>(
     `INSERT INTO persons (display_name, is_adult) VALUES ('Bob Synthetic', true) RETURNING person_id`,
   );
-  const doctor = await client.query(
+  const doctor = await client.query<{ professional_id: string }>(
     `INSERT INTO professionals (display_name) VALUES ('Dr Doctor') RETURNING professional_id`,
   );
-  const nurse = await client.query(
+  const nurse = await client.query<{ professional_id: string }>(
     `INSERT INTO professionals (display_name) VALUES ('N Nurse') RETURNING professional_id`,
   );
-  const admin = await client.query(
+  const admin = await client.query<{ professional_id: string }>(
     `INSERT INTO professionals (display_name) VALUES ('A Admin') RETURNING professional_id`,
   );
-  const bobDoctor = await client.query(
+  const bobDoctor = await client.query<{ professional_id: string }>(
     `INSERT INTO professionals (display_name) VALUES ('Dr Bob') RETURNING professional_id`,
   );
-  const org = await client.query(
+  const org = await client.query<{ organization_id: string }>(
     `INSERT INTO organizations (name) VALUES ('Synthetic Clinic') RETURNING organization_id`,
   );
   const aliceId = alice.rows[0]?.person_id ?? '';
@@ -96,24 +96,24 @@ export async function seedFixture(client: pg.PoolClient): Promise<FixtureIds> {
      VALUES ($1, $2, 'active', 'staff')`,
     [orgId, doctorId],
   );
-  const careTeam = await client.query(
+  const careTeam = await client.query<{ care_team_id: string }>(
     `INSERT INTO care_teams (person_id, status) VALUES ($1, 'open') RETURNING care_team_id`,
     [aliceId],
   );
   const aliceCareTeamId = careTeam.rows[0]?.care_team_id ?? '';
-  const doctorM = await client.query(
+  const doctorM = await client.query<{ membership_id: string }>(
     `INSERT INTO care_team_memberships (care_team_id, person_id, professional_id, status)
      VALUES ($1, $2, $3, 'active') RETURNING membership_id`,
     [aliceCareTeamId, aliceId, doctorId],
   );
-  const nurseM = await client.query(
+  const nurseM = await client.query<{ membership_id: string }>(
     `INSERT INTO care_team_memberships (care_team_id, person_id, professional_id, status)
      VALUES ($1, $2, $3, 'active') RETURNING membership_id`,
     [aliceCareTeamId, aliceId, nurseId],
   );
   const aliceDoctorMembershipId = doctorM.rows[0]?.membership_id ?? '';
   const aliceNurseMembershipId = nurseM.rows[0]?.membership_id ?? '';
-  const bobTeam = await client.query(
+  const bobTeam = await client.query<{ care_team_id: string }>(
     `INSERT INTO care_teams (person_id, status) VALUES ($1, 'open') RETURNING care_team_id`,
     [bobId],
   );
@@ -123,13 +123,13 @@ export async function seedFixture(client: pg.PoolClient): Promise<FixtureIds> {
      VALUES ($1, $2, $3, 'active')`,
     [bobCareTeamId, bobId, bobDoctorId],
   );
-  const consent = await client.query(
+  const consent = await client.query<{ consent_id: string }>(
     `INSERT INTO consents (person_id, grantee_professional_id, status)
      VALUES ($1, $2, 'active') RETURNING consent_id`,
     [aliceId, doctorId],
   );
   const consentId = consent.rows[0]?.consent_id ?? '';
-  const revision = await client.query(
+  const revision = await client.query<{ consent_revision_id: string }>(
     `INSERT INTO consent_revisions (
        consent_id, revision_number, person_id, grantee_professional_id,
        categories, purposes, status, effective_from, issued_by_person_id
@@ -139,7 +139,7 @@ export async function seedFixture(client: pg.PoolClient): Promise<FixtureIds> {
     [consentId, aliceId, doctorId],
   );
   const revisionId = revision.rows[0]?.consent_revision_id ?? '';
-  const grant = await client.query(
+  const grant = await client.query<{ access_grant_id: string }>(
     `INSERT INTO access_grants (
        person_id, grantee_professional_id, category, purpose, status,
        relationship_class, membership_id, consent_revision_id
@@ -173,21 +173,21 @@ export async function seedFixture(client: pg.PoolClient): Promise<FixtureIds> {
      VALUES ($1, 'heart_rate', 80, 'bpm', 'SHARED_HEALTH')`,
     [bobId],
   );
-  const assessment = await client.query(
+  const assessment = await client.query<{ assessment_id: string }>(
     `INSERT INTO assessments (person_id, author_professional_id, status, title, body, version)
      VALUES ($1, $2, 'draft', 'Synthetic assessment', 'body', 1)
      RETURNING assessment_id`,
     [aliceId, doctorId],
   );
   const doctorAssessmentId = assessment.rows[0]?.assessment_id ?? '';
-  const doctorNote = await client.query(
+  const doctorNote = await client.query<{ note_id: string }>(
     `INSERT INTO private_professional_notes (
        person_id, author_professional_id, status, data_class, body
      ) VALUES ($1, $2, 'active', 'PROFESSIONAL_PRIVATE', 'doctor-only note')
      RETURNING note_id`,
     [aliceId, doctorId],
   );
-  const nurseNote = await client.query(
+  const nurseNote = await client.query<{ note_id: string }>(
     `INSERT INTO private_professional_notes (
        person_id, author_professional_id, status, data_class, body
      ) VALUES ($1, $2, 'active', 'PROFESSIONAL_PRIVATE', 'nurse-only note')
