@@ -694,7 +694,7 @@ export async function claimInvitation(
            WHERE kind = 'email' AND normalized_value = $1 AND person_id IS NOT NULL`,
         [claimant],
       );
-      let personId;
+      let personId: PersonId;
       let createdNewPerson = false;
       const prior = existingContact.rows[0];
       if (prior !== undefined) {
