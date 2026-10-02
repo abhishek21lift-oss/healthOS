@@ -4,7 +4,7 @@
  * Contract: docs/architecture/CONTRACT-v0.2.md (FROZEN).
  * Forbidden: database, HTTP, filesystem, env, frameworks, AI SDKs, node builtins.
  */
-export const DOMAIN_CONTRACT_VERSION: '0.2' = '0.2';
+export const DOMAIN_CONTRACT_VERSION = '0.2' as const;
 
 export type DomainBrand<TBrand extends string, TValue> = TValue & {
   readonly __brand: TBrand;
