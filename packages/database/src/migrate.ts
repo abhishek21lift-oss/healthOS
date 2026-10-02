@@ -27,13 +27,13 @@ export function listMigrationFiles(dir: string = migrationsDir): string[] {
 
 export async function runMigrations(pool: pg.Pool, dir: string = migrationsDir): Promise<string[]> {
   const files = listMigrationFiles(dir);
-  const applied = [];
+  const applied: string[] = [];
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock($1)', [MIGRATION_LOCK_KEY]);
     await ensureMigrationTable(client);
-    const existing = await client.query('SELECT filename FROM schema_migrations');
+    const existing = await client.query<{ filename: string }>('SELECT filename FROM schema_migrations');
     const done = new Set(existing.rows.map((r) => r.filename));
     for (const file of files) {
       if (done.has(file)) {
