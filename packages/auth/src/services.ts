@@ -8,7 +8,7 @@
  * All identity-table access runs as trusted `system` principal under FORCE RLS.
  */
 
-import { DomainError } from '@health-os/domain';
+import { DomainError, personId as toPersonId } from '@health-os/domain';
 import {
   beginRequest,
   beginSystemContext,
@@ -699,7 +699,7 @@ export async function claimInvitation(
       const prior = existingContact.rows[0];
       if (prior !== undefined) {
         // I-17: never fork an existing person on contact match.
-        personId = prior.person_id;
+        personId = toPersonId(prior.person_id);
       } else {
         const acc = await client.query<{ person_id: string | null }>(
           `SELECT person_id FROM accounts WHERE email_normalized = $1`,
@@ -707,7 +707,7 @@ export async function claimInvitation(
         );
         const accountPerson = acc.rows[0]?.person_id ?? null;
         if (accountPerson !== null) {
-          personId = accountPerson;
+          personId = toPersonId(accountPerson);
           await client.query(
             `INSERT INTO contact_points (kind, normalized_value, person_id, verified_at)
                VALUES ('email', $1, $2, $3)
@@ -719,7 +719,7 @@ export async function claimInvitation(
             `INSERT INTO persons (display_name, is_adult) VALUES ($1, true) RETURNING person_id`,
             [claimant.split('@')[0] ?? 'person'],
           );
-          personId = person.rows[0]?.person_id ?? '';
+          personId = toPersonId(person.rows[0]?.person_id ?? '');
           createdNewPerson = true;
           await client.query(
             `INSERT INTO contact_points (kind, normalized_value, person_id, verified_at)
