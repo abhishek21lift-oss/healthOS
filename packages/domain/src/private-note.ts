@@ -5,7 +5,7 @@ import type { DataClass } from './primitives.js';
 
 export type PrivateNoteStatus = 'active' | 'voided';
 
-export const PRIVATE_NOTE_DATA_CLASS: 'PROFESSIONAL_PRIVATE' = 'PROFESSIONAL_PRIVATE';
+export const PRIVATE_NOTE_DATA_CLASS = 'PROFESSIONAL_PRIVATE' as const;
 
 export interface PrivateProfessionalNote {
   readonly noteId: PrivateProfessionalNoteId;
