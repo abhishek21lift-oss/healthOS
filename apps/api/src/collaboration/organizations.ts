@@ -172,6 +172,9 @@ export async function inviteOrganizationMember(
   return runInSystemContext(deps.pool, 'collab:invite_member', async (client) => {
     const admin = await loadActiveOrgMembership(client, input.organizationId, actorProfessionalId);
     requireOrgAdmin(admin);
+    if (input.role === 'owner' && admin?.role !== 'owner') {
+      throw new CollaborationError('forbidden', 'Not permitted');
+    }
     const org = await client.query<{ organization_id: string; status: string }>(
       `SELECT organization_id, status FROM organizations WHERE organization_id = $1 FOR UPDATE`,
       [input.organizationId],

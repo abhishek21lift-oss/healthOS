@@ -44,7 +44,7 @@ export function toAuthorizationError(error: unknown): AuthorizationError {
     return new AuthorizationError('validation', 'Invalid request', { cause: error });
   }
   return error instanceof Error
-    ? new AuthorizationError('validation', error.message, { cause: error })
+    ? new AuthorizationError('validation', 'Invalid request', { cause: error })
     : new AuthorizationError('validation', 'Unexpected error', { cause: error });
 }
 
@@ -97,11 +97,23 @@ export interface AuthorizationSecurityEvent {
 }
 
 export function assertNoForbiddenAuthMetadata(metadata: Record<string, unknown>): void {
-  for (const key of ['token', 'password', 'session_token', 'health', 'body']) {
-    if (Object.prototype.hasOwnProperty.call(metadata, key)) {
-      throw new AuthorizationError('validation', 'forbidden metadata', { cause: key });
+  const forbidden = new Set(['token', 'password', 'session_token', 'health', 'body']);
+  const walk = (value: unknown): void => {
+    if (value === null || typeof value !== 'object') {
+      return;
     }
-  }
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+      return;
+    }
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      if (forbidden.has(key)) {
+        throw new AuthorizationError('validation', 'forbidden metadata', { cause: key });
+      }
+      walk(child);
+    }
+  };
+  walk(metadata);
 }
 
 export async function insertAuthorizationEvent(

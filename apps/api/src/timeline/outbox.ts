@@ -49,7 +49,7 @@ interface PendingRow {
  * Returns number of distinct person ids refreshed.
  */
 export async function processTimelineOutbox(pool: Pool): Promise<number> {
-  const personIds = await runInSystemContext(pool, 'treatment', async (client) => {
+  const { personIds, outboxIds } = await runInSystemContext(pool, 'treatment', async (client) => {
     const pending = await client.query<PendingRow>(
       `SELECT outbox_id, person_id, payload
        FROM outbox_events
@@ -60,23 +60,32 @@ export async function processTimelineOutbox(pool: Pool): Promise<number> {
       [TIMELINE_OUTBOX_EVENT_TYPE],
     );
     const ids = new Set<string>();
+    const outboxIds: string[] = [];
     for (const row of pending.rows) {
-      const personId = row.payload.personId ?? row.person_id ?? '';
+      // Prefer the authoritative person_id column over the payload copy.
+      const personId = row.person_id ?? row.payload.personId ?? '';
       if (personId.length > 0) {
         ids.add(personId);
       }
-      await client.query(
-        `UPDATE outbox_events
-         SET status = 'done', attempts = attempts + 1, processed_at = now()
-         WHERE outbox_id = $1`,
-        [row.outbox_id],
-      );
+      outboxIds.push(row.outbox_id);
     }
-    return [...ids];
+    return { personIds: [...ids], outboxIds };
   });
   // Write-through: refresh projection for each person (idempotent).
   for (const personId of personIds) {
     await syncPersonTimeline(pool, personId);
+  }
+  // Mark done only after the projection refresh succeeds, so a crash leaves
+  // rows pending (at-least-once) rather than silently dropping them.
+  if (outboxIds.length > 0) {
+    await runInSystemContext(pool, 'treatment', async (client) => {
+      await client.query(
+        `UPDATE outbox_events
+         SET status = 'done', attempts = attempts + 1, processed_at = now()
+         WHERE outbox_id = ANY($1::text[])`,
+        [outboxIds],
+      );
+    });
   }
   return personIds.length;
 }

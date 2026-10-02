@@ -4,7 +4,7 @@
  * HIGH_SENSITIVITY: server-mediated download only — never returns storage URL/key to clients.
  * No destructive delete (contract).
  */
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 
 import {
   assertDocumentReadable,
@@ -339,7 +339,16 @@ export async function downloadDocument(
   });
   const bytes = await storage.get(doc.storageKey);
   const actual = createHash('sha256').update(bytes).digest('hex');
-  if (actual !== doc.checksumSha256) {
+  // Constant-time comparison to avoid timing side-channel on the checksum.
+  let checksumMatches: boolean;
+  try {
+    const a = Buffer.from(actual, 'hex');
+    const e = Buffer.from(doc.checksumSha256, 'hex');
+    checksumMatches = a.length === e.length && timingSafeEqual(a, e);
+  } catch {
+    checksumMatches = false;
+  }
+  if (!checksumMatches) {
     throw new ClinicalError('conflict', 'Checksum mismatch');
   }
   // High sensitivity: still server-mediated; caller must not log bytes (I-16).

@@ -37,7 +37,7 @@ export function toConsentError(error: unknown): ConsentError {
     return new ConsentError('validation', 'Invalid request', { cause: error });
   }
   return error instanceof Error
-    ? new ConsentError('validation', error.message, { cause: error })
+    ? new ConsentError('validation', 'Invalid request', { cause: error })
     : new ConsentError('validation', 'Unexpected error', { cause: error });
 }
 

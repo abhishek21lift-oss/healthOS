@@ -135,7 +135,8 @@ export async function createProfessionalToPersonInvitation(
   const email = normalizeEmail(input.contactPoint);
   const token = generateToken();
   const tokenHash = hashToken(token);
-  const ttl = input.ttlMs ?? 7 * 24 * 60 * 60 * 1000;
+  const MAX_INVITATION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30-day ceiling (M8)
+  const ttl = Math.min(input.ttlMs ?? 7 * 24 * 60 * 60 * 1000, MAX_INVITATION_TTL_MS);
 
   const invitationId = await runInSystemContext(
     deps.pool,
@@ -218,7 +219,8 @@ export async function createPersonToProfessionalInvitation(
   const email = normalizeEmail(input.contactPoint);
   const token = generateToken();
   const tokenHash = hashToken(token);
-  const ttl = input.ttlMs ?? 7 * 24 * 60 * 60 * 1000;
+  const MAX_INVITATION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30-day ceiling (M8)
+  const ttl = Math.min(input.ttlMs ?? 7 * 24 * 60 * 60 * 1000, MAX_INVITATION_TTL_MS);
 
   const invitationId = await runInSystemContext(
     deps.pool,

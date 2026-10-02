@@ -20,6 +20,10 @@ function defaultSecret(): Buffer {
   if (fromEnv !== undefined && fromEnv.length > 0) {
     return Buffer.from(fromEnv, 'utf8');
   }
+  // Dev-only fallback is forbidden outside development (fail closed in production).
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('TIMELINE_CURSOR_SECRET is required in production (M5)');
+  }
   return Buffer.from('timeline-cursor-dev-only-secret', 'utf8');
 }
 

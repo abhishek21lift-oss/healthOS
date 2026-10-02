@@ -195,6 +195,7 @@ export async function listPrivateNotes(
 ): Promise<readonly PrivateProfessionalNote[]> {
   requireProfessional(actor);
   requirePurpose(input.purpose);
+  const professionalId = requireProfessional(actor);
   const { rows } = await runClinicalAsPrincipal(
     deps,
     actor,
@@ -207,13 +208,14 @@ export async function listPrivateNotes(
         `SELECT note_id, person_id, author_professional_id, status, data_class, body,
                 created_at, updated_at, voided_at
          FROM private_professional_notes
-         WHERE person_id = $1
+         WHERE person_id = $1 AND author_professional_id = $2
          ORDER BY updated_at DESC
          LIMIT 100`,
-        [input.personId],
+        [input.personId, professionalId],
       ),
   );
-  // RLS returns author-only rows; assertAuthorOnly is not needed per-row.
+  // Author-only: private notes must only ever return the acting professional's rows (I-4),
+  // regardless of any RLS (there is none yet).
   return rows.map(mapRow);
 }
 

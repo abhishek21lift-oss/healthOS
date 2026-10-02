@@ -443,6 +443,27 @@ describe('AccessRequest (proposal — no power while pending)', () => {
     expect(await canReadObservationAs(fx.doctorId, fx.personId, 'treatment')).toBe(false);
   });
 
+  it("denies a person accepting another person's request (C1 regression)", async () => {
+    const fx = await resetAndSeed();
+    const { accessRequestId } = await createPersonAccessRequest(
+      deps,
+      professionalActor(fx.doctorId),
+      {
+        personId: fx.personId,
+        scope: { categories: ['timeline_read'], purposes: ['treatment'] },
+      },
+    );
+    await expect(
+      resolvePersonAccessRequest(deps, personActor('different-person-id'), {
+        accessRequestId,
+        decision: 'accept',
+      }),
+    ).rejects.toMatchObject({ code: 'not_found' });
+    // No consent materialized for the request's person, no grants, no access.
+    expect(await activeGrantCount(fx.personId, fx.doctorId)).toBe(0);
+    expect(await canReadObservationAs(fx.doctorId, fx.personId, 'treatment')).toBe(false);
+  });
+
   it('requester can withdraw; double resolve fails', async () => {
     const fx = await resetAndSeed();
     const { accessRequestId } = await createPersonAccessRequest(

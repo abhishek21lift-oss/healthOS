@@ -12,7 +12,7 @@ import {
 import type { AccessGrant as DomainAccessGrant } from '@health-os/domain';
 import { runInSystemContext, type PoolClient } from '@health-os/database';
 
-import { emitAuthorizationEvent, type AuthorizationDeps } from './types.js';
+import { AuthorizationError, emitAuthorizationEvent, type AuthorizationDeps } from './types.js';
 
 export interface CompileGrantsResult {
   readonly compiled: number;
@@ -89,15 +89,72 @@ async function upsertGrant(client: PoolClient, grant: DomainAccessGrant): Promis
 export async function compileAndPersistGrants(
   deps: Pick<AuthorizationDeps, 'pool' | 'onEvent'>,
   input: {
-    readonly revision: ConsentRevision;
+    readonly consentRevisionId: string;
     readonly personId: string;
     readonly granteeProfessionalId: string;
   },
 ): Promise<CompileGrantsResult> {
   return runInSystemContext(deps.pool, 'authz:compile_grants', async (client) => {
+    // H2: load the persisted revision inside the transaction and assert it
+    // belongs to the consent's person — never trust a revision supplied
+    // directly by the caller.
+    const revisionRes = await client.query<{
+      consent_revision_id: string;
+      consent_id: string;
+      revision_number: number;
+      person_id: string;
+      grantee_professional_id: string;
+      categories: string[];
+      purposes: string[];
+      status: string;
+      effective_from: Date;
+      effective_until: Date | null;
+      issued_at: Date;
+      issued_by_person_id: string;
+      supersedes_revision_id: string | null;
+    }>(
+      `SELECT consent_revision_id, consent_id, revision_number, person_id,
+              grantee_professional_id, categories, purposes, status,
+              effective_from, effective_until, issued_at, issued_by_person_id,
+              supersedes_revision_id
+       FROM consent_revisions
+       WHERE consent_revision_id = $1
+       LIMIT 1`,
+      [input.consentRevisionId],
+    );
+    const revRow = revisionRes.rows[0];
+    if (revRow === undefined) {
+      throw new AuthorizationError('not_found', 'Consent revision not found');
+    }
+    if (revRow.person_id !== input.personId) {
+      throw new AuthorizationError('forbidden', 'Consent revision does not belong to this person');
+    }
+    if (revRow.grantee_professional_id !== input.granteeProfessionalId) {
+      throw new AuthorizationError('forbidden', 'Consent revision does not belong to this grantee');
+    }
+    const revision: ConsentRevision = {
+      revisionId: revRow.consent_revision_id as never,
+      consentId: revRow.consent_id as never,
+      revisionNumber: revRow.revision_number,
+      personId: revRow.person_id as never,
+      granteeProfessionalId: revRow.grantee_professional_id as never,
+      scope: {
+        categories: revRow.categories as ConsentRevision['scope']['categories'],
+        purposes: revRow.purposes as ConsentRevision['scope']['purposes'],
+      },
+      status: revRow.status as ConsentRevision['status'],
+      window: {
+        effectiveFrom: revRow.effective_from.getTime(),
+        effectiveUntil: revRow.effective_until === null ? null : revRow.effective_until.getTime(),
+      },
+      issuedAt: revRow.issued_at.getTime(),
+      issuedByPersonId: revRow.issued_by_person_id as never,
+      supersedesRevisionId: revRow.supersedes_revision_id as never,
+    };
+
     const membership = await loadMembership(client, input.personId, input.granteeProfessionalId);
     const grants = domainCompile({
-      consentRevision: input.revision,
+      consentRevision: revision,
       membership,
       grantIdFactory: () => crypto.randomUUID() as never,
     });
@@ -143,7 +200,7 @@ export async function compileAndPersistGrants(
           purpose: 'treatment',
           compiled: grants.length,
           revoked,
-          revisionId: input.revision.revisionId,
+          revisionId: revision.revisionId,
         },
       });
     }

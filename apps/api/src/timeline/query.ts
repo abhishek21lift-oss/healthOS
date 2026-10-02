@@ -10,6 +10,7 @@ import { decodeCursor, encodeCursor } from './cursor.js';
 import { processTimelineOutbox } from './outbox.js';
 import { syncPersonTimeline } from './project.js';
 import {
+  TimelineError,
   type TimelineActor,
   type TimelineDeps,
   type TimelineEntry,
@@ -86,7 +87,16 @@ export async function listTimeline(
   });
 
   const filters: TimelineFilters = input.filters ?? {};
-  const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
+  const rawLimit = input.limit ?? 20;
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100) : 20;
+  const from = filters.from !== undefined ? new Date(filters.from) : null;
+  const to = filters.to !== undefined ? new Date(filters.to) : null;
+  if (
+    (from !== null && Number.isNaN(from.getTime())) ||
+    (to !== null && Number.isNaN(to.getTime()))
+  ) {
+    throw new TimelineError('validation', 'Invalid timeline date filter');
+  }
 
   // Read-your-writes: drain outbox + idempotent sync from canonical sources.
   if (input.sync !== false) {
@@ -142,8 +152,8 @@ export async function listTimeline(
           input.personId,
           eventTypes.length > 0 ? eventTypes : null,
           sourceTypes.length > 0 ? sourceTypes : null,
-          filters.from !== undefined ? new Date(filters.from) : null,
-          filters.to !== undefined ? new Date(filters.to) : null,
+          from,
+          to,
           cursorKey !== null ? new Date(cursorKey.eventAt) : null,
           cursorKey !== null ? cursorKey.entryId : '00000000-0000-0000-0000-000000000000',
           limit + 1,

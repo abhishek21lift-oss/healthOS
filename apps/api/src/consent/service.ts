@@ -172,6 +172,13 @@ function grantIdFactory(): never {
 }
 
 async function insertRevisionRow(client: PoolClient, revision: ConsentRevision): Promise<void> {
+  // Retire any previously-active revision for this consent. The latest revision
+  // is authoritative; leaving the superseded one as 'active' lets it bypass the
+  // narrow/revoke gate in the PEP (M1).
+  await client.query(
+    `UPDATE consent_revisions SET status = 'revoked' WHERE consent_id = $1 AND status = 'active'`,
+    [revision.consentId],
+  );
   await client.query(
     `INSERT INTO consent_revisions (
        consent_revision_id, consent_id, revision_number, person_id,
@@ -814,6 +821,9 @@ export async function resolvePersonAccessRequest(
         status = next.status;
       } else {
         actorPrincipalId = requirePersonActor(actor);
+        if (row.person_id !== actorPrincipalId) {
+          throw new ConsentError('not_found', 'Access request not found');
+        }
         if (input.decision === 'accept') {
           const next = domainAcceptAccessRequest({
             request: base,
