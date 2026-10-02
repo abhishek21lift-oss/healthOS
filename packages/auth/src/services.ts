@@ -8,7 +8,7 @@
  * All identity-table access runs as trusted `system` principal under FORCE RLS.
  */
 
-import { DomainError } from '@health-os/domain';
+import { DomainError, personId as toPersonId } from '@health-os/domain';
 import {
   beginRequest,
   beginSystemContext,
@@ -36,6 +36,83 @@ import type { Pool, PoolClient, PrincipalContext } from '@health-os/database';
 import type { AuthSecurityEvent } from './security-events.js';
 
 const GENERIC_AUTH_FAILURE = 'Unable to sign in';
+
+interface AccountAuthRow {
+  [column: string]: unknown;
+  account_id: string;
+  password_hash: string;
+  status: string;
+  email_verified_at: Date | string | null;
+  failed_login_count: number;
+  locked_until: Date | string | null;
+  person_id: string | null;
+  professional_id: string | null;
+}
+
+interface PersonIdRow {
+  [column: string]: unknown;
+  person_id: string;
+}
+
+interface AccountIdRow {
+  [column: string]: unknown;
+  account_id: string;
+}
+
+interface EmailVerificationRow {
+  [column: string]: unknown;
+  verification_id: string;
+  account_id: string;
+  expires_at: Date | string;
+  consumed_at: Date | string | null;
+}
+
+interface SessionIdRow {
+  [column: string]: unknown;
+  session_id: string;
+}
+
+interface LogoutSessionRow {
+  [column: string]: unknown;
+  session_id: string;
+  account_id: string;
+}
+
+interface SessionPrincipalRow {
+  [column: string]: unknown;
+  session_id: string;
+  account_id: string;
+  expires_at: Date | string;
+  absolute_expires_at: Date | string;
+  revoked_at: Date | string | null;
+  last_seen_at: Date | string;
+  email_normalized: string;
+  status: string;
+  person_id: string | null;
+  professional_id: string | null;
+}
+
+interface InvitationRow {
+  [column: string]: unknown;
+  invitation_id: string;
+  status: string;
+  expires_at: Date | string;
+  contact_point: string;
+  recipient_normalized: string | null;
+  consumed_at: Date | string | null;
+}
+
+interface ContactPointRow {
+  [column: string]: unknown;
+  person_id: string;
+  verified_at: Date | string | null;
+}
+
+interface AccountPersonRow {
+  [column: string]: unknown;
+  person_id: string | null;
+}
+
 function emit(deps: AuthDeps, event: AuthSecurityEvent) {
   assertNoSecrets(event);
   deps.onSecurityEvent?.(event);
@@ -71,7 +148,7 @@ function limitOrFail(
   }
 }
 async function loadAccountByEmail(client: PoolClient, email: string) {
-  const res = await client.query(
+  const res = await client.query<AccountAuthRow>(
     `SELECT account_id, password_hash, status, email_verified_at,
             failed_login_count, locked_until, person_id, professional_id
      FROM accounts WHERE email_normalized = $1`,
@@ -186,12 +263,12 @@ export async function registerAccount(
       if ((existing.rowCount ?? 0) > 0) {
         throw new AuthError('duplicate_identity', 'Unable to register');
       }
-      const person = await client.query(
+      const person = await client.query<PersonIdRow>(
         `INSERT INTO persons (display_name, is_adult) VALUES ($1, true) RETURNING person_id`,
         [email.split('@')[0] ?? 'person'],
       );
       const newPersonId = person.rows[0]?.person_id ?? '';
-      const acc = await client.query(
+      const acc = await client.query<AccountIdRow>(
         `INSERT INTO accounts (
            email_normalized, email_display, password_hash, status,
            birth_date, person_id
@@ -267,7 +344,7 @@ export async function verifyEmail(
   const tokenHash = hashToken(input.token);
   const now = nowDate(deps);
   const result = await runInSystemContext(deps.pool, 'auth:verify_email', async (client) => {
-    const found = await client.query(
+    const found = await client.query<EmailVerificationRow>(
       `SELECT verification_id, account_id, expires_at, consumed_at
        FROM email_verification_tokens
        WHERE token_hash = $1`,
@@ -398,7 +475,7 @@ export async function login(
     const sessionToken = generateToken();
     const csrfToken = generateCsrfToken();
     const tokenHash = hashToken(sessionToken);
-    const sess = await client.query(
+    const sess = await client.query<SessionIdRow>(
       `INSERT INTO sessions (
          account_id, token_hash, csrf_token, created_at, last_seen_at,
          authenticated_at, expires_at, absolute_expires_at
@@ -454,7 +531,7 @@ export async function logout(
 ): Promise<void> {
   const tokenHash = hashToken(input.sessionToken);
   await runInSystemContext(deps.pool, 'auth:logout', async (client) => {
-    const res = await client.query(
+    const res = await client.query<LogoutSessionRow>(
       `UPDATE sessions
        SET revoked_at = $1
        WHERE token_hash = $2 AND revoked_at IS NULL
@@ -495,7 +572,7 @@ export async function resolveSession(
     | { kind: 'idle_expired'; sessionId: string }
     | { kind: 'touch'; principal: AuthenticatedPrincipal }
   >(deps.pool, 'auth:resolve_session', async (client) => {
-    const res = await client.query(
+    const res = await client.query<SessionPrincipalRow>(
       `SELECT s.session_id, s.account_id, s.expires_at, s.absolute_expires_at,
                 s.revoked_at, s.last_seen_at,
                 a.email_normalized, a.status, a.person_id, a.professional_id
@@ -512,7 +589,7 @@ export async function resolveSession(
       {
         expiresAt: new Date(row.expires_at),
         absoluteExpiresAt: new Date(row.absolute_expires_at),
-        revokedAt: row.revoked_at,
+        revokedAt: row.revoked_at === null ? null : new Date(row.revoked_at),
       },
       now,
     );
@@ -565,13 +642,13 @@ export async function rotateSession(
   const tokenHash = hashToken(sessionToken);
   const previousHash = hashToken(input.sessionToken);
   const sessionId = await runInSystemContext(deps.pool, 'auth:rotate_session', async (client) => {
-    const old = await client.query(
+    const old = await client.query<SessionIdRow>(
       `UPDATE sessions SET revoked_at = $1 WHERE token_hash = $2 AND revoked_at IS NULL
          RETURNING session_id`,
       [now, previousHash],
     );
     const previousId = old.rows[0]?.session_id ?? null;
-    const sess = await client.query(
+    const sess = await client.query<SessionIdRow>(
       `INSERT INTO sessions (
            account_id, token_hash, csrf_token, created_at, last_seen_at,
            authenticated_at, expires_at, absolute_expires_at, rotated_from_session_id
@@ -613,7 +690,7 @@ export async function revokeSessionById(
   meta: RequestMeta = {},
 ): Promise<void> {
   await runInSystemContext(deps.pool, 'auth:revoke_session', async (client) => {
-    const res = await client.query(
+    const res = await client.query<AccountIdRow>(
       `UPDATE sessions SET revoked_at = $1 WHERE session_id = $2 AND revoked_at IS NULL
        RETURNING account_id`,
       [nowDate(deps), sessionId],
@@ -657,7 +734,7 @@ export async function claimInvitation(
   const now = nowDate(deps);
   try {
     const result = await runInSystemContext(deps.pool, 'auth:claim_invitation', async (client) => {
-      const found = await client.query(
+      const found = await client.query<InvitationRow>(
         `SELECT invitation_id, status, expires_at, contact_point,
                   recipient_normalized, consumed_at
            FROM invitations
@@ -689,25 +766,25 @@ export async function claimInvitation(
         });
         throw new AuthError('wrong_recipient', 'Invitation is invalid or expired');
       }
-      const existingContact = await client.query(
+      const existingContact = await client.query<ContactPointRow>(
         `SELECT person_id, verified_at FROM contact_points
            WHERE kind = 'email' AND normalized_value = $1 AND person_id IS NOT NULL`,
         [claimant],
       );
-      let personId;
+      let personId: PersonId;
       let createdNewPerson = false;
       const prior = existingContact.rows[0];
       if (prior !== undefined) {
         // I-17: never fork an existing person on contact match.
-        personId = prior.person_id;
+        personId = toPersonId(prior.person_id);
       } else {
-        const acc = await client.query(
+        const acc = await client.query<AccountPersonRow>(
           `SELECT person_id FROM accounts WHERE email_normalized = $1`,
           [claimant],
         );
         const accountPerson = acc.rows[0]?.person_id ?? null;
         if (accountPerson !== null) {
-          personId = accountPerson;
+          personId = toPersonId(accountPerson);
           await client.query(
             `INSERT INTO contact_points (kind, normalized_value, person_id, verified_at)
                VALUES ('email', $1, $2, $3)
@@ -715,11 +792,11 @@ export async function claimInvitation(
             [claimant, personId, now],
           );
         } else {
-          const person = await client.query(
+          const person = await client.query<PersonIdRow>(
             `INSERT INTO persons (display_name, is_adult) VALUES ($1, true) RETURNING person_id`,
             [claimant.split('@')[0] ?? 'person'],
           );
-          personId = person.rows[0]?.person_id ?? '';
+          personId = toPersonId(person.rows[0]?.person_id ?? '');
           createdNewPerson = true;
           await client.query(
             `INSERT INTO contact_points (kind, normalized_value, person_id, verified_at)
@@ -729,7 +806,7 @@ export async function claimInvitation(
           );
         }
       }
-      const accepted = await client.query(
+      const accepted = await client.query<{ invitation_id: string }>(
         `UPDATE invitations
            SET status = 'accepted', consumed_at = $1, claimed_person_id = $2
            WHERE invitation_id = $3 AND status = 'pending' AND consumed_at IS NULL
@@ -799,7 +876,7 @@ export async function createInvitation(
     deps.pool,
     'auth:create_invitation',
     async (client) => {
-      const res = await client.query(
+      const res = await client.query<{ invitation_id: string }>(
         `INSERT INTO invitations (
            flow, status, contact_point, invited_by_professional_id, organization_id,
            requested_categories, issued_at, expires_at, token_hash, recipient_normalized

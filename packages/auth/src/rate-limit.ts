@@ -22,7 +22,7 @@ export type RateLimitDecision =
 export class RateLimiter {
   private readonly buckets = new Map<string, { hits: number[] }>();
   private readonly maxKeys;
-  constructor(maxKeys: number = 10_000) {
+  constructor(maxKeys = 10_000) {
     this.maxKeys = maxKeys;
   }
   check(rule: RateLimitRule, now: number = Date.now()): RateLimitDecision {
