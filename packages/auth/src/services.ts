@@ -254,7 +254,7 @@ export async function registerAccount(
         throw new AuthError('duplicate_identity', 'Unable to register');
       }
       const person = await client.query<PersonIdRow>(
-        `INSERT INTO persons (display_name, is_adult) VALUES ($1, true) RETURNING person_id`, 
+        `INSERT INTO persons (display_name, is_adult) VALUES ($1, true) RETURNING person_id`,
         [email.split('@')[0] ?? 'person'],
       );
       const newPersonId = person.rows[0]?.person_id ?? '';
