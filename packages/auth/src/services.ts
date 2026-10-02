@@ -589,7 +589,7 @@ export async function resolveSession(
       {
         expiresAt: new Date(row.expires_at),
         absoluteExpiresAt: new Date(row.absolute_expires_at),
-        revokedAt: row.revoked_at,
+        revokedAt: row.revoked_at === null ? null : new Date(row.revoked_at),
       },
       now,
     );
