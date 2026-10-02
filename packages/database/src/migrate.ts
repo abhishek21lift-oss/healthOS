@@ -33,7 +33,9 @@ export async function runMigrations(pool: pg.Pool, dir: string = migrationsDir):
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock($1)', [MIGRATION_LOCK_KEY]);
     await ensureMigrationTable(client);
-    const existing = await client.query<{ filename: string }>('SELECT filename FROM schema_migrations');
+    const existing = await client.query<{ filename: string }>(
+      'SELECT filename FROM schema_migrations',
+    );
     const done = new Set(existing.rows.map((r) => r.filename));
     for (const file of files) {
       if (done.has(file)) {
