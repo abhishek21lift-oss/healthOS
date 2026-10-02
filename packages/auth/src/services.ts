@@ -38,6 +38,7 @@ import type { AuthSecurityEvent } from './security-events.js';
 const GENERIC_AUTH_FAILURE = 'Unable to sign in';
 
 interface AccountAuthRow {
+  [column: string]: unknown;
   account_id: string;
   password_hash: string;
   status: string;
@@ -49,14 +50,17 @@ interface AccountAuthRow {
 }
 
 interface PersonIdRow {
+  [column: string]: unknown;
   person_id: string;
 }
 
 interface AccountIdRow {
+  [column: string]: unknown;
   account_id: string;
 }
 
 interface EmailVerificationRow {
+  [column: string]: unknown;
   verification_id: string;
   account_id: string;
   expires_at: Date | string;
@@ -64,15 +68,18 @@ interface EmailVerificationRow {
 }
 
 interface SessionIdRow {
+  [column: string]: unknown;
   session_id: string;
 }
 
 interface LogoutSessionRow {
+  [column: string]: unknown;
   session_id: string;
   account_id: string;
 }
 
 interface SessionPrincipalRow {
+  [column: string]: unknown;
   session_id: string;
   account_id: string;
   expires_at: Date | string;
@@ -86,6 +93,7 @@ interface SessionPrincipalRow {
 }
 
 interface InvitationRow {
+  [column: string]: unknown;
   invitation_id: string;
   status: string;
   expires_at: Date | string;
@@ -95,11 +103,13 @@ interface InvitationRow {
 }
 
 interface ContactPointRow {
+  [column: string]: unknown;
   person_id: string;
   verified_at: Date | string | null;
 }
 
 interface AccountPersonRow {
+  [column: string]: unknown;
   person_id: string | null;
 }
 
